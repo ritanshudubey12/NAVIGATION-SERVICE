@@ -1,0 +1,205 @@
+openapi: 3.1.0
+info:
+  title: Navigation API
+  version: 1.0.0
+  description: Navigation microservice for the website builder. IDs are BIGINT decimal strings.
+servers:
+  - url: http://localhost:4019
+security:
+  - BearerAuth: []
+tags:
+  - { name: Menus }
+  - { name: Items }
+  - { name: Revisions }
+  - { name: Public }
+  - { name: Ops }
+paths:
+  /health:
+    get: { tags: [Ops], security: [], summary: Liveness, responses: { '200': { description: OK } } }
+  /ready:
+    get: { tags: [Ops], security: [], summary: Readiness (database), responses: { '200': { description: Ready }, '503': { description: Database unavailable } } }
+  /api/v1/websites/{websiteId}/navigation-menus:
+    parameters: [{ $ref: '#/components/parameters/WebsiteId' }]
+    get:
+      tags: [Menus]
+      summary: List menus (navigation:read)
+      parameters:
+        - { name: placement, in: query, schema: { $ref: '#/components/schemas/Placement' } }
+        - { name: status, in: query, schema: { enum: [DRAFT, PUBLISHED] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: sort, in: query, schema: { enum: [name, created_at, placement], default: created_at } }
+        - { name: order, in: query, schema: { enum: [asc, desc], default: desc } }
+      responses: { '200': { description: OK }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+    post:
+      tags: [Menus]
+      summary: Create menu (navigation:create)
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateMenu' } } } }
+      responses:
+        '201': { description: Created (Location + ETag headers) }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/navigation-menus/{menuId}:
+    parameters: [{ $ref: '#/components/parameters/MenuId' }]
+    get: { tags: [Menus], summary: Read menu (navigation:read), responses: { '200': { description: OK (ETag) }, '404': { $ref: '#/components/responses/Error' } } }
+    patch:
+      tags: [Menus]
+      summary: Update metadata (navigation:update)
+      parameters: [{ $ref: '#/components/parameters/IfMatch' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PatchMenu' } } } }
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+    delete: { tags: [Menus], summary: Archive menu (navigation:archive|delete), responses: { '200': { description: Archived }, '404': { $ref: '#/components/responses/Error' } } }
+  /api/v1/navigation-menus/{menuId}/items:
+    parameters: [{ $ref: '#/components/parameters/MenuId' }]
+    get: { tags: [Items], summary: Read menu tree (navigation:read), responses: { '200': { description: Nested tree (ETag) } } }
+    post:
+      tags: [Items]
+      summary: Create item or group (navigation:update)
+      parameters: [{ $ref: '#/components/parameters/IfMatch' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateItem' } } } }
+      responses: { '201': { description: Created }, '400': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /api/v1/navigation-menus/{menuId}/items/{itemId}:
+    parameters: [{ $ref: '#/components/parameters/MenuId' }, { $ref: '#/components/parameters/ItemId' }]
+    patch:
+      tags: [Items]
+      summary: Edit or move item (navigation:update)
+      parameters: [{ $ref: '#/components/parameters/IfMatch' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateItem' } } } }
+      responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+    delete: { tags: [Items], summary: Remove item and its descendants from the draft, responses: { '200': { description: Deleted }, '404': { $ref: '#/components/responses/Error' } } }
+  /api/v1/navigation-menus/{menuId}/reorder:
+    parameters: [{ $ref: '#/components/parameters/MenuId' }]
+    post:
+      tags: [Items]
+      summary: Transactional batch reorder / move
+      parameters: [{ $ref: '#/components/parameters/IfMatch' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [itemId, parentItemId, sortOrder]
+                    properties:
+                      itemId: { $ref: '#/components/schemas/Id' }
+                      parentItemId: { oneOf: [{ $ref: '#/components/schemas/Id' }, { type: 'null' }] }
+                      sortOrder: { type: integer, minimum: 0 }
+      responses: { '200': { description: New tree }, '400': { $ref: '#/components/responses/Error' } }
+  /api/v1/navigation-menus/{menuId}/revisions:
+    parameters: [{ $ref: '#/components/parameters/MenuId' }]
+    get: { tags: [Revisions], summary: List revisions, responses: { '200': { description: OK } } }
+    post:
+      tags: [Revisions]
+      summary: Snapshot the current draft into a new DRAFT revision
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { content: { application/json: { schema: { type: object, additionalProperties: false } } } }
+      responses: { '201': { description: Created } }
+  /api/v1/navigation-menus/{menuId}/publish:
+    parameters: [{ $ref: '#/components/parameters/MenuId' }]
+    post:
+      tags: [Revisions]
+      summary: Validate and publish a revision (navigation:publish)
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RevisionAction' } } } }
+      responses: { '200': { description: Published (or already published) }, '400': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+  /api/v1/navigation-menus/{menuId}/restore:
+    parameters: [{ $ref: '#/components/parameters/MenuId' }]
+    post:
+      tags: [Revisions]
+      summary: Restore an old revision into the draft as a NEW draft revision
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RevisionAction' } } } }
+      responses: { '201': { description: New draft revision created } }
+  /api/v1/public/websites/{websiteId}/navigation/{placement}:
+    parameters:
+      - { $ref: '#/components/parameters/WebsiteId' }
+      - { name: placement, in: path, required: true, schema: { $ref: '#/components/schemas/Placement' } }
+    get:
+      tags: [Public]
+      security: []
+      summary: Published navigation only (never drafts)
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Error' } }
+components:
+  securitySchemes:
+    BearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    WebsiteId: { name: websiteId, in: path, required: true, schema: { $ref: '#/components/schemas/Id' } }
+    MenuId: { name: menuId, in: path, required: true, schema: { $ref: '#/components/schemas/Id' } }
+    ItemId: { name: itemId, in: path, required: true, schema: { $ref: '#/components/schemas/Id' } }
+    IfMatch: { name: If-Match, in: header, required: false, schema: { type: string, example: 'W/"3"' }, description: Menu ETag; stale value returns 409 REVISION_CONFLICT }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: false, schema: { type: string, minLength: 8, maxLength: 128 } }
+  responses:
+    Error:
+      description: Error envelope
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+  schemas:
+    Id: { type: string, pattern: '^[0-9]+$', example: '9007199254740993' }
+    Placement: { type: string, enum: [HEADER, FOOTER, SIDEBAR, MOBILE, CUSTOM] }
+    CreateMenu:
+      type: object
+      additionalProperties: false
+      required: [name, slug, placement]
+      properties:
+        name: { type: string, maxLength: 150 }
+        slug: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', maxLength: 100 }
+        placement: { $ref: '#/components/schemas/Placement' }
+    PatchMenu:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string }
+        slug: { type: string }
+        placement: { $ref: '#/components/schemas/Placement' }
+    CreateItem:
+      type: object
+      additionalProperties: false
+      required: [label, itemKind]
+      properties:
+        parentItemId: { oneOf: [{ $ref: '#/components/schemas/Id' }, { type: 'null' }] }
+        label: { type: string, maxLength: 120 }
+        itemKind: { enum: [LINK, GROUP] }
+        linkType: { enum: [INTERNAL_PAGE, EXTERNAL_URL, ANCHOR, APPROVED_SYSTEM_ROUTE] }
+        targetPageId: { $ref: '#/components/schemas/Id' }
+        externalUrl: { type: string, description: 'https, http, mailto or tel only' }
+        anchor: { type: string }
+        systemRoute: { type: string }
+        sortOrder: { type: integer, minimum: 0 }
+        openInNewTab: { type: boolean }
+        accessibilityLabel: { type: string, maxLength: 200 }
+        translations:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [locale, label]
+            properties: { locale: { type: string, example: fr-CA }, label: { type: string }, accessibilityLabel: { type: string } }
+    RevisionAction:
+      type: object
+      additionalProperties: false
+      required: [revisionId]
+      properties: { revisionId: { $ref: '#/components/schemas/Id' } }
+    ErrorEnvelope:
+      type: object
+      required: [success, error, meta]
+      properties:
+        success: { const: false }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { enum: [VALIDATION_ERROR, INVALID_ID, INVALID_TREE, UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, DUPLICATE_MENU, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, PAYLOAD_TOO_LARGE, RATE_LIMITED, DEPENDENCY_UNAVAILABLE, INTERNAL_ERROR] }
+            message: { type: string }
+            details: {}
+        meta: { type: object, properties: { requestId: { type: string } } }

@@ -1,0 +1,10 @@
+{
+  "name": "dev-platform",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.21.2",
+    "jose": "^5.9.6"
+  }
+}

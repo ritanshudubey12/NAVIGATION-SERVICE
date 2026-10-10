@@ -1,0 +1,76 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: navigation
+      POSTGRES_USER_FILE: /run/secrets/db_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_user, db_password]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$(cat /run/secrets/db_user) -d navigation"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # One-off deployment job: migrations are not run from every API replica.
+  migrate:
+    build: ./backend
+    command: ["node", "dist/db/migrate.js"]
+    environment:
+      DB_HOST: db
+      DB_NAME: navigation
+    secrets: [db_user, db_password]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # Local stand-in for Identity (JWKS + token minting), Website API, Page API and the event sink.
+  dev-platform:
+    build: ./dev-platform
+    environment:
+      JWT_ISSUER: http://dev-platform:4010
+      JWT_AUDIENCE: navigation-api
+    secrets: [idp_client_secret]
+    ports:
+      - "4010:4010"
+
+  navigation-api:
+    build: ./backend
+    ports:
+      - "4019:4019"
+    environment:
+      NODE_ENV: development          # production requires an https JWKS URL
+      PORT: "4019"
+      DB_HOST: db
+      DB_NAME: navigation
+      JWT_ISSUER: http://dev-platform:4010
+      JWT_AUDIENCE: navigation-api
+      JWT_JWKS_URL: http://dev-platform:4010/.well-known/jwks.json
+      WEBSITE_API_URL: http://dev-platform:4010
+      PAGE_API_URL: http://dev-platform:4010
+      PUBLISHING_EVENT_SINK_URL: http://dev-platform:4010/internal/events
+    secrets: [db_user, db_password]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      dev-platform:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4019/ready >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+secrets:
+  db_user:
+    file: ./secrets/db_user.txt
+  db_password:
+    file: ./secrets/db_password.txt
+  idp_client_secret:
+    file: ./secrets/idp_client_secret.txt
+
+volumes:
+  pgdata:

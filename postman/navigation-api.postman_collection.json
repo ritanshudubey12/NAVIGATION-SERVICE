@@ -1,0 +1,3840 @@
+{
+  "info": {
+    "name": "Navigation API",
+    "description": "Navigation API microservice (website builder). Run top to bottom (or with Newman). Folders 00-03 and 05 expect 200 OK / 201 Created; folder 04 asserts the documented 4xx error contract.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{adminToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "viewerToken",
+      "value": ""
+    },
+    {
+      "key": "otherTenantToken",
+      "value": ""
+    },
+    {
+      "key": "expiredToken",
+      "value": ""
+    },
+    {
+      "key": "wrongAudToken",
+      "value": ""
+    },
+    {
+      "key": "wrongIssuerToken",
+      "value": ""
+    },
+    {
+      "key": "slug",
+      "value": ""
+    },
+    {
+      "key": "footerSlug",
+      "value": ""
+    },
+    {
+      "key": "sidebarSlug",
+      "value": ""
+    },
+    {
+      "key": "idemKey",
+      "value": ""
+    },
+    {
+      "key": "menuId",
+      "value": ""
+    },
+    {
+      "key": "footerMenuId",
+      "value": ""
+    },
+    {
+      "key": "sidebarMenuId",
+      "value": ""
+    },
+    {
+      "key": "etag",
+      "value": ""
+    },
+    {
+      "key": "groupItemId",
+      "value": ""
+    },
+    {
+      "key": "pageItemId",
+      "value": ""
+    },
+    {
+      "key": "urlItemId",
+      "value": ""
+    },
+    {
+      "key": "anchorItemId",
+      "value": ""
+    },
+    {
+      "key": "routeItemId",
+      "value": ""
+    },
+    {
+      "key": "i18nItemId",
+      "value": ""
+    },
+    {
+      "key": "revisionId",
+      "value": ""
+    },
+    {
+      "key": "revision2Id",
+      "value": ""
+    },
+    {
+      "key": "revision3Id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Setup, health & tokens",
+      "item": [
+        {
+          "name": "GET /health - 200 OK",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"slug\", \"main-\" + Date.now());",
+                  "pm.collectionVariables.set(\"footerSlug\", \"footer-\" + Date.now());",
+                  "pm.collectionVariables.set(\"sidebarSlug\", \"side-\" + Date.now());",
+                  "pm.collectionVariables.set(\"idemKey\", \"idem-\" + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"GET /health returns 200 OK\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json(); pm.test(\"liveness\", () => pm.expect(j.status).to.eql(\"ok\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /ready - 200 OK (database reachable)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ready"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"GET /ready returns 200 OK\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json(); pm.test(\"ready\", () => pm.expect(j.status).to.eql(\"ready\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "IdP: token - admin (tenant 1001, all permissions)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{idpUrl}}/token",
+              "host": [
+                "{{idpUrl}}"
+              ],
+              "path": [
+                "token"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientSecret\": \"{{idpClientSecret}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json(); pm.test(\"token issued\", () => pm.expect(j.accessToken).to.be.a(\"string\")); pm.collectionVariables.set(\"adminToken\", j.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "IdP: token - viewer (read only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{idpUrl}}/token",
+              "host": [
+                "{{idpUrl}}"
+              ],
+              "path": [
+                "token"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientSecret\": \"{{idpClientSecret}}\",\n  \"permissions\": [\n    \"navigation:read\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json(); pm.test(\"token issued\", () => pm.expect(j.accessToken).to.be.a(\"string\")); pm.collectionVariables.set(\"viewerToken\", j.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "IdP: token - other tenant admin (tenant 1002)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{idpUrl}}/token",
+              "host": [
+                "{{idpUrl}}"
+              ],
+              "path": [
+                "token"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientSecret\": \"{{idpClientSecret}}\",\n  \"tenantId\": \"1002\",\n  \"organizationId\": \"2002\",\n  \"sub\": \"3002\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json(); pm.test(\"token issued\", () => pm.expect(j.accessToken).to.be.a(\"string\")); pm.collectionVariables.set(\"otherTenantToken\", j.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "IdP: token - expired",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{idpUrl}}/token",
+              "host": [
+                "{{idpUrl}}"
+              ],
+              "path": [
+                "token"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientSecret\": \"{{idpClientSecret}}\",\n  \"expiresIn\": -600\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json(); pm.test(\"token issued\", () => pm.expect(j.accessToken).to.be.a(\"string\")); pm.collectionVariables.set(\"expiredToken\", j.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "IdP: token - wrong audience",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{idpUrl}}/token",
+              "host": [
+                "{{idpUrl}}"
+              ],
+              "path": [
+                "token"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientSecret\": \"{{idpClientSecret}}\",\n  \"audience\": \"some-other-api\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json(); pm.test(\"token issued\", () => pm.expect(j.accessToken).to.be.a(\"string\")); pm.collectionVariables.set(\"wrongAudToken\", j.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "IdP: token - wrong issuer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{idpUrl}}/token",
+              "host": [
+                "{{idpUrl}}"
+              ],
+              "path": [
+                "token"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientSecret\": \"{{idpClientSecret}}\",\n  \"issuer\": \"http://evil.example\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json(); pm.test(\"token issued\", () => pm.expect(j.accessToken).to.be.a(\"string\")); pm.collectionVariables.set(\"wrongIssuerToken\", j.accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 Menus",
+      "item": [
+        {
+          "name": "POST /websites/:websiteId/navigation-menus - 201 Created (HEADER)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Main Navigation\",\n  \"slug\": \"{{slug}}\",\n  \"placement\": \"HEADER\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); \n      pm.test(\"id is a decimal string\", () => { pm.expect(j.data.id).to.be.a(\"string\"); pm.expect(j.data.id).to.match(/^[0-9]+$/); });\n      pm.test(\"menu fields\", () => { pm.expect(j.data.websiteId).to.eql(pm.variables.get(\"websiteId\")); pm.expect(j.data.status).to.eql(\"DRAFT\"); pm.expect(j.data.placement).to.eql(\"HEADER\"); pm.expect(j.data.version).to.eql(1); });\n      pm.test(\"Location + ETag headers\", () => { pm.expect(pm.response.headers.get(\"Location\")).to.include(\"/api/v1/navigation-menus/\" + j.data.id); pm.expect(pm.response.headers.get(\"ETag\")).to.eql('W/\"1\"'); });\n      pm.test(\"no server-derived scope leaked\", () => { pm.expect(j.data).to.not.have.property(\"tenantId\"); });\n      pm.collectionVariables.set(\"menuId\", j.data.id); pm.collectionVariables.set(\"etag\", pm.response.headers.get(\"ETag\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST create menu - 201 replay with same Idempotency-Key (no duplicate)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Main Navigation\",\n  \"slug\": \"{{slug}}\",\n  \"placement\": \"HEADER\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"original result replayed\", () => { pm.expect(pm.response.headers.get(\"Idempotency-Replayed\")).to.eql(\"true\"); pm.expect(j.data.id).to.eql(pm.collectionVariables.get(\"menuId\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /websites/:websiteId/navigation-menus - 201 Created (FOOTER)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Footer Links\",\n  \"slug\": \"{{footerSlug}}\",\n  \"placement\": \"FOOTER\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.collectionVariables.set(\"footerMenuId\", j.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /websites/:websiteId/navigation-menus - 201 Created (SIDEBAR draft)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sidebar\",\n  \"slug\": \"{{sidebarSlug}}\",\n  \"placement\": \"SIDEBAR\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.collectionVariables.set(\"sidebarMenuId\", j.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /websites/:websiteId/navigation-menus - 200 OK",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"list contains created menu + pagination\", () => { pm.expect(j.data.map(m => m.id)).to.include(pm.collectionVariables.get(\"menuId\")); pm.expect(j.meta.pagination.total).to.be.at.least(3); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET menus with filter/sort/pagination - 200 OK",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus?placement=HEADER&limit=10&sort=name&order=asc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ],
+              "query": [
+                {
+                  "key": "placement",
+                  "value": "HEADER"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "name"
+                },
+                {
+                  "key": "order",
+                  "value": "asc"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"only HEADER menus\", () => { pm.expect(j.data.length).to.be.at.least(1); j.data.forEach(m => pm.expect(m.placement).to.eql(\"HEADER\")); pm.expect(j.meta.pagination.limit).to.eql(10); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /navigation-menus/:menuId - 200 OK",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"menu + ETag\", () => { pm.expect(j.data.id).to.eql(pm.collectionVariables.get(\"menuId\")); pm.expect(j.data.slug).to.eql(pm.collectionVariables.get(\"slug\")); pm.expect(pm.response.headers.get(\"ETag\")).to.be.a(\"string\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /navigation-menus/:menuId - 200 OK (If-Match)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{etag}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Main Navigation (updated)\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"name updated, version bumped\", () => { pm.expect(j.data.name).to.eql(\"Main Navigation (updated)\"); pm.expect(j.data.version).to.eql(2); }); pm.collectionVariables.set(\"etag\", pm.response.headers.get(\"ETag\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Menu items & tree",
+      "item": [
+        {
+          "name": "POST /navigation-menus/:menuId/items - 201 Created (GROUP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Company\",\n  \"itemKind\": \"GROUP\",\n  \"sortOrder\": 0,\n  \"accessibilityLabel\": \"Company pages\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"id is a decimal string\", () => { pm.expect(j.data.id).to.be.a(\"string\"); pm.expect(j.data.id).to.match(/^[0-9]+$/); }); pm.test(\"group\", () => { pm.expect(j.data.itemKind).to.eql(\"GROUP\"); pm.expect(j.data.linkType).to.eql(null); pm.expect(j.data.menuId).to.eql(pm.collectionVariables.get(\"menuId\")); }); pm.collectionVariables.set(\"groupItemId\", j.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST item - 201 Created (INTERNAL_PAGE, BIGINT page id, nested)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parentItemId\": \"{{groupItemId}}\",\n  \"label\": \"About\",\n  \"itemKind\": \"LINK\",\n  \"linkType\": \"INTERNAL_PAGE\",\n  \"targetPageId\": \"9007199254741001\",\n  \"sortOrder\": 0,\n  \"openInNewTab\": false\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"BIGINT page id round-trips exactly as a string\", () => { pm.expect(j.data.targetPageId).to.eql(\"9007199254741001\"); pm.expect(j.data.parentItemId).to.eql(pm.collectionVariables.get(\"groupItemId\")); });\n      pm.test(\"raw body keeps id as a JSON string\", () => pm.expect(pm.response.text()).to.include('\"targetPageId\":\"9007199254741001\"')); pm.collectionVariables.set(\"pageItemId\", j.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST item - 201 Created (EXTERNAL_URL, new tab)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parentItemId\": \"{{groupItemId}}\",\n  \"label\": \"Partner site\",\n  \"itemKind\": \"LINK\",\n  \"linkType\": \"EXTERNAL_URL\",\n  \"externalUrl\": \"https://partner.example\",\n  \"sortOrder\": 1,\n  \"openInNewTab\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"external url\", () => { pm.expect(j.data.externalUrl).to.eql(\"https://partner.example\"); pm.expect(j.data.openInNewTab).to.eql(true); }); pm.collectionVariables.set(\"urlItemId\", j.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST item - 201 Created (ANCHOR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Contact\",\n  \"itemKind\": \"LINK\",\n  \"linkType\": \"ANCHOR\",\n  \"anchor\": \"#contact\",\n  \"sortOrder\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"anchor normalized\", () => pm.expect(j.data.anchor).to.eql(\"contact\")); pm.collectionVariables.set(\"anchorItemId\", j.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST item - 201 Created (APPROVED_SYSTEM_ROUTE)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Log in\",\n  \"itemKind\": \"LINK\",\n  \"linkType\": \"APPROVED_SYSTEM_ROUTE\",\n  \"systemRoute\": \"/login\",\n  \"sortOrder\": 2\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"route\", () => pm.expect(j.data.systemRoute).to.eql(\"/login\")); pm.collectionVariables.set(\"routeItemId\", j.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST item - 201 Created (translations + accessibility label)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Pricing\",\n  \"itemKind\": \"LINK\",\n  \"linkType\": \"ANCHOR\",\n  \"anchor\": \"pricing\",\n  \"sortOrder\": 3,\n  \"accessibilityLabel\": \"Go to pricing\",\n  \"translations\": [\n    {\n      \"locale\": \"fr\",\n      \"label\": \"Tarifs\",\n      \"accessibilityLabel\": \"Aller aux tarifs\"\n    },\n    {\n      \"locale\": \"de-DE\",\n      \"label\": \"Preise\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"translations stored\", () => { pm.expect(j.data.translations.map(t => t.locale)).to.have.members([\"de-DE\", \"fr\"]); pm.expect(j.data.accessibilityLabel).to.eql(\"Go to pricing\"); }); pm.collectionVariables.set(\"i18nItemId\", j.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /navigation-menus/:menuId/items - 200 OK (tree)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"nested tree, ordered siblings\", () => { pm.expect(j.data.items.length).to.eql(4); const g = j.data.items.find(i => i.id === pm.collectionVariables.get(\"groupItemId\")); pm.expect(g.children.map(c => c.label)).to.eql([\"About\", \"Partner site\"]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /navigation-menus/:menuId/items/:itemId - 200 OK",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items/{{urlItemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items",
+                "{{urlItemId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Partners\",\n  \"openInNewTab\": false,\n  \"externalUrl\": \"https://partners.example\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"updated\", () => { pm.expect(j.data.label).to.eql(\"Partners\"); pm.expect(j.data.externalUrl).to.eql(\"https://partners.example\"); pm.expect(j.data.openInNewTab).to.eql(false); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH item - 200 OK (move anchor under group)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items/{{anchorItemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items",
+                "{{anchorItemId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parentItemId\": \"{{groupItemId}}\",\n  \"sortOrder\": 2\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"moved\", () => pm.expect(j.data.parentItemId).to.eql(pm.collectionVariables.get(\"groupItemId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /navigation-menus/:menuId/reorder - 200 OK (batch move)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/reorder",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "reorder"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"itemId\": \"{{routeItemId}}\",\n      \"parentItemId\": null,\n      \"sortOrder\": 0\n    },\n    {\n      \"itemId\": \"{{i18nItemId}}\",\n      \"parentItemId\": null,\n      \"sortOrder\": 1\n    },\n    {\n      \"itemId\": \"{{groupItemId}}\",\n      \"parentItemId\": null,\n      \"sortOrder\": 2\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"new root order\", () => pm.expect(j.data.items.map(i => i.id)).to.eql([pm.collectionVariables.get(\"routeItemId\"), pm.collectionVariables.get(\"i18nItemId\"), pm.collectionVariables.get(\"groupItemId\")]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Revisions, publish & public reads",
+      "item": [
+        {
+          "name": "GET public SIDEBAR before publish - 404 (draft never exposed)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/websites/{{websiteId}}/navigation/SIDEBAR",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "websites",
+                "{{websiteId}}",
+                "navigation",
+                "SIDEBAR"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404 NOT_FOUND\", () => pm.response.to.have.status(404));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code NOT_FOUND\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"NOT_FOUND\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /navigation-menus/:menuId/revisions - 201 Created (snapshot 1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/revisions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "revisions"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"id is a decimal string\", () => { pm.expect(j.data.id).to.be.a(\"string\"); pm.expect(j.data.id).to.match(/^[0-9]+$/); }); pm.test(\"draft revision 1\", () => { pm.expect(j.data.revisionNumber).to.eql(1); pm.expect(j.data.status).to.eql(\"DRAFT\"); pm.expect(j.data.checksum).to.have.length(64); pm.expect(j.data.rootItemCount).to.eql(3); }); pm.collectionVariables.set(\"revisionId\", j.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /navigation-menus/:menuId/revisions - 200 OK",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/revisions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "revisions"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"lists revision\", () => pm.expect(j.data.map(r => r.id)).to.include(pm.collectionVariables.get(\"revisionId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET public HEADER before publish - 404 (draft not exposed)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/websites/{{websiteId}}/navigation/HEADER",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "websites",
+                "{{websiteId}}",
+                "navigation",
+                "HEADER"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404 (nothing published yet)\", () => pm.response.to.have.status(404));",
+                  "const j = pm.response.json(); pm.test(\"draft slug not exposed\", () => pm.expect(pm.response.text()).to.not.include(pm.collectionVariables.get(\"slug\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /navigation-menus/:menuId/publish - 200 OK",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "publish-{{idemKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "publish"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"revisionId\": \"{{revisionId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"revision + pointer switched\", () => { pm.expect(j.data.revision.status).to.eql(\"PUBLISHED\"); pm.expect(j.data.menu.status).to.eql(\"PUBLISHED\"); pm.expect(j.data.menu.currentPublishedRevisionId).to.eql(pm.collectionVariables.get(\"revisionId\")); pm.expect(j.data.alreadyPublished).to.eql(false); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST publish again - 200 OK (already published, no-op)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "publish"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"revisionId\": \"{{revisionId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"no-op\", () => pm.expect(j.data.alreadyPublished).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /public/websites/:websiteId/navigation/:placement - 200 OK (no auth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/websites/{{websiteId}}/navigation/HEADER",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "websites",
+                "{{websiteId}}",
+                "navigation",
+                "HEADER"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"published menu returned\", () => { const m = j.data.menus.find(x => x.slug === pm.collectionVariables.get(\"slug\")); pm.expect(m).to.be.an(\"object\"); pm.expect(m.items.length).to.eql(3); pm.expect(m.revisionNumber).to.eql(1); });\n      pm.test(\"no private metadata\", () => { const t = pm.response.text(); [\"tenantId\", \"organizationId\", \"createdBy\", \"updatedBy\", \"currentPublishedRevisionId\"].forEach(k => pm.expect(t).to.not.include(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH item after publish - 200 OK (draft edit only)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items/{{routeItemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items",
+                "{{routeItemId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"DRAFT-ONLY EDIT\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"draft changed\", () => pm.expect(j.data.label).to.eql(\"DRAFT-ONLY EDIT\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET public after draft edit - 200 OK (published copy unchanged)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/websites/{{websiteId}}/navigation/HEADER",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "websites",
+                "{{websiteId}}",
+                "navigation",
+                "HEADER"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"draft edit not visible publicly\", () => { pm.expect(pm.response.text()).to.not.include(\"DRAFT-ONLY EDIT\"); const m = j.data.menus.find(x => x.slug === pm.collectionVariables.get(\"slug\")); pm.expect(m.items.map(i => i.label)).to.include(\"Log in\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST revisions - 201 Created (snapshot 2 incl. draft edit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/revisions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "revisions"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"revision 2\", () => pm.expect(j.data.revisionNumber).to.eql(2)); pm.collectionVariables.set(\"revision2Id\", j.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /navigation-menus/:menuId/restore - 201 Created (restore rev 1 as new draft)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/restore",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "restore"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"revisionId\": \"{{revisionId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"history not mutated: new revision 3\", () => { pm.expect(j.data.revision.revisionNumber).to.eql(3); pm.expect(j.data.revision.status).to.eql(\"DRAFT\"); }); pm.collectionVariables.set(\"revision3Id\", j.data.revision.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET items after restore - 200 OK (draft rolled back)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"draft edit undone by restore\", () => { const r = j.data.items.find(i => i.linkType === \"APPROVED_SYSTEM_ROUTE\"); pm.expect(r.label).to.eql(\"Log in\"); pm.expect(j.data.items.length).to.eql(3); });\n      pm.test(\"restore recreated items with fresh ids; refresh variables\", () => { const g = j.data.items.find(i => i.itemKind === \"GROUP\"); pm.collectionVariables.set(\"groupItemId\", g.id); pm.collectionVariables.set(\"pageItemId\", g.children.find(c => c.linkType === \"INTERNAL_PAGE\").id); pm.collectionVariables.set(\"routeItemId\", j.data.items.find(i => i.linkType === \"APPROVED_SYSTEM_ROUTE\").id); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST publish revision 3 - 200 OK (republish, previous archived)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "publish"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"revisionId\": \"{{revision3Id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"revision 3 live\", () => { pm.expect(j.data.revision.status).to.eql(\"PUBLISHED\"); pm.expect(j.data.menu.currentPublishedRevisionId).to.eql(pm.collectionVariables.get(\"revision3Id\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET revisions - 200 OK (one PUBLISHED, older ARCHIVED)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/revisions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "revisions"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"exactly one published\", () => { pm.expect(j.data.filter(r => r.status === \"PUBLISHED\").length).to.eql(1); pm.expect(j.data.find(r => r.revisionNumber === 1).status).to.eql(\"ARCHIVED\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /navigation-menus/:menuId/items/:itemId - 200 OK",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items/{{routeItemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items",
+                "{{routeItemId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"deleted\", () => pm.expect(j.data.deleted).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Security & validation (expected 4xx)",
+      "item": [
+        {
+          "name": "No token - 401 UNAUTHENTICATED",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 401 UNAUTHENTICATED\", () => pm.response.to.have.status(401));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code UNAUTHENTICATED\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"UNAUTHENTICATED\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Expired token - 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{expiredToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 401 UNAUTHENTICATED\", () => pm.response.to.have.status(401));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code UNAUTHENTICATED\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"UNAUTHENTICATED\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Wrong audience - 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{wrongAudToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 401 UNAUTHENTICATED\", () => pm.response.to.have.status(401));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code UNAUTHENTICATED\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"UNAUTHENTICATED\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Wrong issuer - 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{wrongIssuerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 401 UNAUTHENTICATED\", () => pm.response.to.have.status(401));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code UNAUTHENTICATED\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"UNAUTHENTICATED\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tampered signature - 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const t = pm.collectionVariables.get(\"adminToken\"); const bad = t.slice(0, -4) + (t.endsWith(\"AAAA\") ? \"BBBB\" : \"AAAA\"); pm.request.headers.upsert({ key: \"Authorization\", value: \"Bearer \" + bad });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 401 UNAUTHENTICATED\", () => pm.response.to.have.status(401));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code UNAUTHENTICATED\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"UNAUTHENTICATED\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token in query string is ignored - 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus?access_token={{adminToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ],
+              "query": [
+                {
+                  "key": "access_token",
+                  "value": "{{adminToken}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 401 UNAUTHENTICATED\", () => pm.response.to.have.status(401));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code UNAUTHENTICATED\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"UNAUTHENTICATED\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Viewer cannot create - 403 FORBIDDEN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{viewerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"x\",\n  \"slug\": \"viewer-attempt\",\n  \"placement\": \"HEADER\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 403 FORBIDDEN\", () => pm.response.to.have.status(403));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code FORBIDDEN\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"FORBIDDEN\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Viewer cannot publish - 403 FORBIDDEN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "publish"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{viewerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"revisionId\": \"{{revisionId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 403 FORBIDDEN\", () => pm.response.to.have.status(403));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code FORBIDDEN\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"FORBIDDEN\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Viewer CAN read - 200 OK",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{viewerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Other tenant on this website - 403 FORBIDDEN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{otherTenantToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"x\",\n  \"slug\": \"other-tenant\",\n  \"placement\": \"HEADER\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 403 FORBIDDEN\", () => pm.response.to.have.status(403));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code FORBIDDEN\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"FORBIDDEN\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin on a website of another tenant - 403 FORBIDDEN",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{otherWebsiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{otherWebsiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 403 FORBIDDEN\", () => pm.response.to.have.status(403));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code FORBIDDEN\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"FORBIDDEN\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Other tenant reads this tenant menu - 404 (no leakage)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{otherTenantToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404 NOT_FOUND\", () => pm.response.to.have.status(404));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code NOT_FOUND\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"NOT_FOUND\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Other tenant edits this tenant menu - 404",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{otherTenantToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"hijack\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404 NOT_FOUND\", () => pm.response.to.have.status(404));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code NOT_FOUND\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"NOT_FOUND\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Spoofed tenantId/createdBy in body - 400 VALIDATION_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Spoof\",\n  \"slug\": \"spoof\",\n  \"placement\": \"HEADER\",\n  \"tenantId\": \"1002\",\n  \"organizationId\": \"2002\",\n  \"createdBy\": \"1\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 VALIDATION_ERROR\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code VALIDATION_ERROR\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"VALIDATION_ERROR\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "accessToken in JSON body - 400 VALIDATION_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tok\",\n  \"slug\": \"tok\",\n  \"placement\": \"HEADER\",\n  \"accessToken\": \"abc\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 VALIDATION_ERROR\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code VALIDATION_ERROR\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"VALIDATION_ERROR\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid placement - 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"x\",\n  \"slug\": \"x-y\",\n  \"placement\": \"TOP\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 VALIDATION_ERROR\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code VALIDATION_ERROR\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"VALIDATION_ERROR\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Malformed JSON - 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": "
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 VALIDATION_ERROR\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code VALIDATION_ERROR\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"VALIDATION_ERROR\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Non-numeric id - 400 INVALID_ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "abc"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 INVALID_ID\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code INVALID_ID\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"INVALID_ID\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BIGINT overflow id - 400 INVALID_ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/9223372036854775808",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "9223372036854775808"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 INVALID_ID\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code INVALID_ID\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"INVALID_ID\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown menu - 404 NOT_FOUND",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/999999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "999999999999"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404 NOT_FOUND\", () => pm.response.to.have.status(404));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code NOT_FOUND\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"NOT_FOUND\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown route - 404 NOT_FOUND",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/does-not-exist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "does-not-exist"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404 NOT_FOUND\", () => pm.response.to.have.status(404));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code NOT_FOUND\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"NOT_FOUND\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown revision on publish - 404",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "publish"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"revisionId\": \"999999999999\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404 NOT_FOUND\", () => pm.response.to.have.status(404));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code NOT_FOUND\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"NOT_FOUND\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Duplicate slug - 409 DUPLICATE_MENU",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dup\",\n  \"slug\": \"{{slug}}\",\n  \"placement\": \"HEADER\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 409 DUPLICATE_MENU\", () => pm.response.to.have.status(409));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code DUPLICATE_MENU\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"DUPLICATE_MENU\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Idempotency-Key reused with different payload - 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/navigation-menus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "websites",
+                "{{websiteId}}",
+                "navigation-menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Different\",\n  \"slug\": \"different-payload\",\n  \"placement\": \"HEADER\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 409 IDEMPOTENCY_CONFLICT\", () => pm.response.to.have.status(409));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code IDEMPOTENCY_CONFLICT\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"IDEMPOTENCY_CONFLICT\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stale If-Match - 409 REVISION_CONFLICT",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "If-Match",
+                "value": "W/\"1\""
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Stale write\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 409 REVISION_CONFLICT\", () => pm.response.to.have.status(409));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code REVISION_CONFLICT\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"REVISION_CONFLICT\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "javascript: URL - 400 VALIDATION_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"XSS\",\n  \"itemKind\": \"LINK\",\n  \"linkType\": \"EXTERNAL_URL\",\n  \"externalUrl\": \"javascript:alert(1)\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 VALIDATION_ERROR\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code VALIDATION_ERROR\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"VALIDATION_ERROR\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "data: URL - 400 VALIDATION_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Data\",\n  \"itemKind\": \"LINK\",\n  \"linkType\": \"EXTERNAL_URL\",\n  \"externalUrl\": \"data:text/html,<script>1</script>\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 VALIDATION_ERROR\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code VALIDATION_ERROR\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"VALIDATION_ERROR\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unapproved system route - 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Admin\",\n  \"itemKind\": \"LINK\",\n  \"linkType\": \"APPROVED_SYSTEM_ROUTE\",\n  \"systemRoute\": \"/admin\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 VALIDATION_ERROR\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code VALIDATION_ERROR\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"VALIDATION_ERROR\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Page from another website - 400 VALIDATION_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Foreign page\",\n  \"itemKind\": \"LINK\",\n  \"linkType\": \"INTERNAL_PAGE\",\n  \"targetPageId\": \"3001\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 VALIDATION_ERROR\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code VALIDATION_ERROR\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"VALIDATION_ERROR\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GROUP with a destination - 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Bad group\",\n  \"itemKind\": \"GROUP\",\n  \"externalUrl\": \"https://x.example\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 VALIDATION_ERROR\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code VALIDATION_ERROR\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"VALIDATION_ERROR\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cross-menu parent - 400 INVALID_TREE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{footerMenuId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{footerMenuId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parentItemId\": \"{{groupItemId}}\",\n  \"label\": \"Wrong menu\",\n  \"itemKind\": \"GROUP\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 INVALID_TREE\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code INVALID_TREE\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"INVALID_TREE\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tree cycle via reorder - 400 INVALID_TREE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/reorder",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "reorder"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"itemId\": \"{{groupItemId}}\",\n      \"parentItemId\": \"{{pageItemId}}\",\n      \"sortOrder\": 0\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 INVALID_TREE\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code INVALID_TREE\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"INVALID_TREE\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Self-parenting via PATCH - 400 INVALID_TREE",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}/items/{{groupItemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}",
+                "items",
+                "{{groupItemId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parentItemId\": \"{{groupItemId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 INVALID_TREE\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code INVALID_TREE\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"INVALID_TREE\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 Cleanup (archive)",
+      "item": [
+        {
+          "name": "DELETE /navigation-menus/:menuId - 200 OK (archive HEADER)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });",
+                  "const j = pm.response.json(); pm.test(\"archived\", () => pm.expect(j.data.status).to.eql(\"ARCHIVED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE footer menu - 200 OK",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{footerMenuId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{footerMenuId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE sidebar menu - 200 OK",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{sidebarMenuId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{sidebarMenuId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"success envelope + requestId\", () => { const j = pm.response.json(); pm.expect(j.success).to.eql(true); pm.expect(j.meta.requestId).to.be.a(\"string\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET archived menu - 404 NOT_FOUND",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/navigation-menus/{{menuId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "navigation-menus",
+                "{{menuId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404 NOT_FOUND\", () => pm.response.to.have.status(404));",
+                  "const j = pm.response.json(); pm.test(\"error envelope code NOT_FOUND\", () => { pm.expect(j.success).to.eql(false); pm.expect(j.error.code).to.eql(\"NOT_FOUND\"); pm.expect(j.meta.requestId).to.be.a(\"string\"); pm.expect(JSON.stringify(j)).to.not.match(/stack|SELECT |at \\w+\\./); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET public HEADER after archive - archived menu no longer served",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/websites/{{websiteId}}/navigation/HEADER",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "websites",
+                "{{websiteId}}",
+                "navigation",
+                "HEADER"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); pm.test(\"archived menu is not rendered\", () => { pm.expect([200, 404]).to.include(pm.response.code); pm.expect(pm.response.text()).to.not.include(pm.collectionVariables.get(\"slug\")); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
